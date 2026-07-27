@@ -125,24 +125,34 @@ so a restart begins a fresh day/equity curve from `config.yaml`'s
 
 ### Configuring
 
-Edit `config.yaml` for account size, the sizing `risk_pct` default, fixed
-indicator periods, R:R minimum, and heartbeat interval. **Note:** the
-running engine reads active timeframes, indicator toggles, live risk
-params, and signal geometry from Postgres (`strategy_settings`,
-`indicator_config`, `risk_params` — set via the Telegram `/settings`
-menu), *not* from `config.yaml`; the `data:` block in `config.yaml`
-documents the seed only (the engine does not read it). **Never lower
-`risk.circuit_breaker_halt_pct` below −2.5%** (build spec section 6/11 —
-it's a hard-coded constant in `risk/circuit_breaker.py`, not read from
-config, specifically so it can't be casually widened).
+Edit `config.yaml` for the values the running engine actually consumes:
+account size (`account.starting_equity_usd`), the BTC quantity step
+(`risk.btc_sz_decimals`), the 4H-bias `strategy.fractal_width` /
+`strategy.sr_lookback`, the polled `data.coin`, the heartbeat interval,
+and the `feature_flags` execution switch. **Note:** the running engine
+reads active timeframes, indicator toggles, live risk params, and signal
+geometry from Postgres (`strategy_settings`, `indicator_config`,
+`risk_params` — set via the Telegram `/settings` menu), *not* from
+`config.yaml`; the `data:` block in `config.yaml` documents the seed only
+(the engine does not read it). Likewise `risk.risk_pct`,
+`strategy.fisher_period`, `strategy.obv_sma_period`, and
+`strategy.min_reward_risk` are **documentation of the code's defaults, not
+live inputs** — the effective `risk_pct` comes from the DB `risk_params`,
+and the indicator periods and R:R minimum are module constants
+(`strategy/trigger_1h.py`, `strategy/signals.py`); editing those keys
+alone changes nothing. **Never lower `risk.circuit_breaker_halt_pct` below
+−2.5%** (build spec section 6/11 — it's a hard-coded constant in
+`risk/circuit_breaker.py`, not read from config, specifically so it can't
+be casually widened).
 
 ### Reading logs / alerts
 
 - Console/stdout: `INFO` level per-loop status, `WARNING` on feed or
   Telegram-send failures (never a silent `except: pass`).
-- Telegram channel: four alert types — entry signal, exit (stop/target),
+- Telegram channel: six alert types — entry signal, exit (stop/target),
   daily summary (00:00 UTC), heartbeat (every 4h — silence means the
-  process is dead).
+  process is dead), regime shift (T2, on any 4H bias change, silent), and
+  circuit-breaker halt (on the −2.5% daily-P&L trip).
 
 ## Tests
 
@@ -150,13 +160,14 @@ config, specifically so it can't be casually widened).
 python -m pytest -q
 ```
 
-The suite is **240 tests across 29 files** (229 passing, 11 skipped in a
+The suite is **246 tests across 30 files** (235 passing, 11 skipped in a
 default environment) covering the strategy, risk, ledger, alerts,
 execution-client and data layers against synthetic data (no live API
 calls). The 11 skips are the DB-backed suites that need
 `TEST_DATABASE_URL` (`tests/test_db_trigger.py`,
 `tests/test_forward_report.py` — see below) plus the web-dashboard tests
-that need the optional `web/requirements.txt` deps. These are the
+(`tests/test_web_dashboard.py`, `tests/test_confluence_insight.py`) that
+need the optional `web/requirements.txt` deps. These are the
 acceptance contract: if a change breaks one, fix the module, not the
 test.
 
