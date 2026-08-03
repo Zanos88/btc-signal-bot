@@ -5,16 +5,25 @@ account:
   starting_equity_usd: 100000  # Propr 1-Step Classic challenge size
 
 risk:
-  risk_pct: 0.0075        # 0.75% per trade, within spec's 0.5-1.0% band
+  # NOTE: risk_pct here is a documented seed only — the engine reads the
+  # LIVE risk_pct from Postgres (risk_params, set via /risk). Editing this
+  # value alone changes nothing at runtime. btc_sz_decimals IS read.
+  risk_pct: 0.0075        # 0.75% per trade, within spec's 0.5-1.0% band (seed; DB-authoritative)
   btc_sz_decimals: 5      # BTC-PERP quantity step on Hyperliquid; prefer live meta lookup
-  circuit_breaker_halt_pct: -0.025  # -2.5%, DO NOT WIDEN (see risk/circuit_breaker.py)
+  circuit_breaker_halt_pct: -0.025  # -2.5%, DO NOT WIDEN. Documentation only — the real value is
+                                    # the hard-coded HALT_THRESHOLD_PCT in risk/circuit_breaker.py.
 
 strategy:
-  fisher_period: 10       # Ehlers' primary-source default (Rev. 2 research); supersedes the platform-convention 9
-  obv_sma_period: 20
-  fractal_width: 2
-  sr_lookback: 20
-  min_reward_risk: 2.0
+  # NOTE: fisher_period, obv_sma_period and min_reward_risk are
+  # documentation of the code's defaults — the engine uses the module
+  # constants FISHER_PERIOD / OBV_SMA_PERIOD (strategy/trigger_1h.py) and
+  # MIN_REWARD_RISK (strategy/signals.py, risk/gate.py), NOT these keys.
+  # Only fractal_width and sr_lookback are read (4H-bias computation).
+  fisher_period: 10       # Ehlers' primary-source default (Rev. 2 research); supersedes the platform-convention 9 (seed)
+  obv_sma_period: 20      # seed; live value is the OBV_SMA_PERIOD constant
+  fractal_width: 2        # READ by the engine (compute_bias)
+  sr_lookback: 20         # READ by the engine (compute_bias)
+  min_reward_risk: 2.0    # seed; live value is the MIN_REWARD_RISK constant
 
 data:
   coin: BTC
