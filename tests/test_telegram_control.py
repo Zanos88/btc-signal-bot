@@ -302,6 +302,35 @@ def test_frame_b_markup_shape():
     assert all(len(cb.encode()) <= 64 for cb in all_callbacks)   # Telegram callback_data limit
 
 
+def test_frame_a_markup_round_trips_through_take_skip_handlers():
+    """Producer/consumer contract: the Frame A keyboard built in
+    main.frame_a_markup must emit callback_data that the take/skip handlers
+    parse back correctly. Both sides were previously tested only in
+    isolation (handlers against hand-written strings), so a change to the
+    `take_<pct>_<id>` / `skip_<id>` format would slip through silently.
+    """
+    from main import frame_a_markup
+
+    signal_id = "01ARZ3NDEKTSV4RRFFQ69G5FAV"  # 26-char Crockford ULID (no underscores)
+    rows = frame_a_markup(signal_id)["inline_keyboard"]
+    callbacks = [b["callback_data"] for row in rows for b in row]
+
+    assert callbacks == [f"take_0.75_{signal_id}", f"take_0.5_{signal_id}", f"skip_{signal_id}"]
+    assert all(len(cb.encode()) <= 64 for cb in callbacks)  # Telegram callback_data limit
+
+    # cb_take_signal parses with split("_", 2) -> [verb, pct, signal_id]
+    for cb in callbacks[:2]:
+        verb, pct_str, parsed_id = cb.split("_", 2)
+        assert verb == "take"
+        assert float(pct_str) in (0.75, 0.5)
+        assert parsed_id == signal_id
+
+    # cb_skip_signal parses with split("_", 1) -> [verb, signal_id]
+    verb, parsed_id = callbacks[2].split("_", 1)
+    assert verb == "skip"
+    assert parsed_id == signal_id
+
+
 def test_dashboard_attaches_frame_b_only_with_positions():
     # with a position -> Frame B keyboard attached
     services, _, execution = make_services()
