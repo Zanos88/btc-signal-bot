@@ -140,9 +140,11 @@ config, specifically so it can't be casually widened).
 
 - Console/stdout: `INFO` level per-loop status, `WARNING` on feed or
   Telegram-send failures (never a silent `except: pass`).
-- Telegram channel: four alert types — entry signal, exit (stop/target),
-  daily summary (00:00 UTC), heartbeat (every 4h — silence means the
-  process is dead).
+- Telegram channel: six alert types — entry signal, exit (stop/target),
+  circuit-breaker halt (`format_halt_alert`, T5, on the −2.5% daily
+  breach), regime shift (`format_regime_shift`, T2, on a 4H bias change —
+  delivered silently), daily summary (00:00 UTC, silent) and heartbeat
+  (every 4h, silent — silence means the process is dead).
 
 ## Tests
 
@@ -150,7 +152,7 @@ config, specifically so it can't be casually widened).
 python -m pytest -q
 ```
 
-The suite is **240 tests across 29 files** (229 passing, 11 skipped in a
+The suite is **241 tests across 29 files** (230 passing, 11 skipped in a
 default environment) covering the strategy, risk, ledger, alerts,
 execution-client and data layers against synthetic data (no live API
 calls). The 11 skips are the DB-backed suites that need
