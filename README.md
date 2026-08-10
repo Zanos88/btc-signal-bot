@@ -133,8 +133,10 @@ and the `feature_flags` execution switch. **Note:** the running engine
 reads active timeframes, indicator toggles, live risk params, and signal
 geometry from Postgres (`strategy_settings`, `indicator_config`,
 `risk_params` — set via the Telegram `/settings` menu), *not* from
-`config.yaml`; the `data:` block in `config.yaml` documents the seed only
-(the engine does not read it). Likewise `risk.risk_pct`,
+`config.yaml`; the timeframe/mode seed in the `data:` block is
+documentation only (the engine reads those from Postgres, not
+`config.yaml`) — only `data.coin` is read from that block. Likewise
+`risk.risk_pct`,
 `strategy.fisher_period`, `strategy.obv_sma_period`, and
 `strategy.min_reward_risk` are **documentation of the code's defaults, not
 live inputs** — the effective `risk_pct` comes from the DB `risk_params`,
