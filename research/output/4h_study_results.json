@@ -1,0 +1,102 @@
+{
+  "TSMOM180_base_IS": {
+    "label": "IS",
+    "sharpe": 1.364,
+    "defl_sharpe": 0.431,
+    "ann_ret_pct": 87.44,
+    "vol_pct": 64.11,
+    "max_dd_pct": -44.94,
+    "net_mult": 21.557,
+    "n_trades": 245
+  },
+  "TSMOM180_base_OOS": {
+    "label": "OOS",
+    "sharpe": -0.033,
+    "defl_sharpe": -0.011,
+    "ann_ret_pct": -1.54,
+    "vol_pct": 46.26,
+    "max_dd_pct": -51.49,
+    "net_mult": 0.786,
+    "n_trades": 162
+  },
+  "TSMOM180_conviction_IS": {
+    "label": "IS",
+    "sharpe": -1.099,
+    "defl_sharpe": -0.348,
+    "ann_ret_pct": -77.21,
+    "vol_pct": 70.24,
+    "max_dd_pct": -99.31,
+    "net_mult": 0.009,
+    "n_trades": 9280
+  },
+  "TSMOM180_conviction_OOS": {
+    "label": "OOS",
+    "sharpe": -3.835,
+    "defl_sharpe": -1.213,
+    "ann_ret_pct": -154.74,
+    "vol_pct": 40.35,
+    "max_dd_pct": -95.93,
+    "net_mult": 0.041,
+    "n_trades": 4278
+  },
+  "FundMR_proxy_4H_IS": {
+    "label": "IS",
+    "sharpe": -0.816,
+    "defl_sharpe": -0.258,
+    "ann_ret_pct": -31.91,
+    "vol_pct": 39.08,
+    "max_dd_pct": -88.17,
+    "net_mult": 0.163,
+    "n_trades": 286
+  },
+  "FundMR_proxy_4H_OOS": {
+    "label": "OOS",
+    "sharpe": 0.453,
+    "defl_sharpe": 0.143,
+    "ann_ret_pct": 13.38,
+    "vol_pct": 29.55,
+    "max_dd_pct": -29.21,
+    "net_mult": 1.194,
+    "n_trades": 101
+  },
+  "Combined_IS": {
+    "label": "IS",
+    "sharpe": 0.685,
+    "defl_sharpe": 0.217,
+    "ann_ret_pct": 45.96,
+    "vol_pct": 67.1,
+    "max_dd_pct": -68.23,
+    "net_mult": 2.935,
+    "n_trades": 523
+  },
+  "Combined_OOS": {
+    "label": "OOS",
+    "sharpe": -0.012,
+    "defl_sharpe": -0.004,
+    "ann_ret_pct": -0.65,
+    "vol_pct": 56.18,
+    "max_dd_pct": -61.56,
+    "net_mult": 0.724,
+    "n_trades": 255
+  },
+  "BuyHold_IS": {
+    "label": "IS",
+    "sharpe": 1.068,
+    "defl_sharpe": 0.338,
+    "ann_ret_pct": 68.94,
+    "vol_pct": 64.53,
+    "max_dd_pct": -77.04,
+    "net_mult": 9.032,
+    "n_trades": 0
+  },
+  "BuyHold_OOS": {
+    "label": "OOS",
+    "sharpe": 0.222,
+    "defl_sharpe": 0.07,
+    "ann_ret_pct": 10.27,
+    "vol_pct": 46.26,
+    "max_dd_pct": -53.45,
+    "net_mult": 0.992,
+    "n_trades": 0
+  }
+}

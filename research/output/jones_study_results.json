@@ -1,0 +1,103 @@
+{
+  "results": [
+    {
+      "label": "TSMOM30_base_IS",
+      "ann_ret": 431.7,
+      "sharpe": 2.896,
+      "deflated_sharpe": 2.864,
+      "max_dd": -41.23,
+      "total_return": 210830.06,
+      "n_years": 4.6,
+      "n_trades": 905
+    },
+    {
+      "label": "TSMOM30_base_OOS",
+      "ann_ret": 267.76,
+      "sharpe": 3.246,
+      "deflated_sharpe": 3.227,
+      "max_dd": -16.75,
+      "total_return": 1191.21,
+      "n_years": 2.0,
+      "n_trades": 337
+    },
+    {
+      "label": "TSMOM30_conviction_IS",
+      "ann_ret": 587.43,
+      "sharpe": 3.257,
+      "deflated_sharpe": 3.226,
+      "max_dd": -30.2,
+      "total_return": 684109.3,
+      "n_years": 4.6,
+      "n_trades": 763
+    },
+    {
+      "label": "TSMOM30_conviction_OOS",
+      "ann_ret": 161.37,
+      "sharpe": 2.66,
+      "deflated_sharpe": 2.64,
+      "max_dd": -18.62,
+      "total_return": 560.16,
+      "n_years": 2.0,
+      "n_trades": 221
+    },
+    {
+      "label": "FundMR_proxy_IS",
+      "ann_ret": 95.09,
+      "sharpe": 2.604,
+      "deflated_sharpe": 2.572,
+      "max_dd": -15.58,
+      "total_return": 2035.63,
+      "n_years": 4.6,
+      "n_trades": 340
+    },
+    {
+      "label": "FundMR_proxy_OOS",
+      "ann_ret": 61.52,
+      "sharpe": 2.347,
+      "deflated_sharpe": 2.328,
+      "max_dd": -11.87,
+      "total_return": 156.47,
+      "n_years": 2.0,
+      "n_trades": 166
+    },
+    {
+      "label": "Combined_IS",
+      "ann_ret": 480.3,
+      "sharpe": 3.62,
+      "deflated_sharpe": 3.588,
+      "max_dd": -20.53,
+      "total_return": 314794.89,
+      "n_years": 4.6,
+      "n_trades": 769
+    },
+    {
+      "label": "Combined_OOS",
+      "ann_ret": 249.38,
+      "sharpe": 3.303,
+      "deflated_sharpe": 3.284,
+      "max_dd": -15.59,
+      "total_return": 1067.47,
+      "n_years": 2.0,
+      "n_trades": 361
+    },
+    {
+      "label": "BuyHold_full",
+      "ann_ret": 39.88,
+      "sharpe": 0.863,
+      "deflated_sharpe": 0.832,
+      "max_dd": -76.63,
+      "total_return": 800.37,
+      "n_years": 6.5,
+      "n_trades": 1275
+    }
+  ],
+  "params": {
+    "data": "binance_spot_1d_proxy",
+    "bars": 2391,
+    "split": "70% IS (1673), 30% OOS (718)",
+    "tsmom_fast": 10,
+    "tsmom_slow": 30,
+    "fund_lookback": 60,
+    "conviction_bands": "0.5/1.0/1.5x at |z|<0.5/1.0/1.0+"
+  }
+}

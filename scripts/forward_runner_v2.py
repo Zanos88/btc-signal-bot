@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 """
-Forward Runner v2 — TSMOM14 Signal Writer
-Generates trade-ready signals with comp-informed sizing.
-NOTE: This is a paper signal-writer (Writes JSON, no exchange API).
-Kelly fraction uses full-sample Sharpe 0.93 as forward estimate (best available,
-but circular — see tsmom_variant_study for honest OOS assessment).
+Forward Runner v2 — TSMOM14 for Propr Comp
+Deployed as cron every 6h. Generates trade-ready signals with comp-compliant sizing.
 
-Strategy: TSMOM14 (14-day momentum), sizing capped by daily-loss constraint.
-Actual leverage is computed from vol and daily loss limit, not the 2.0x target.
+Comp conditions: ~5% daily loss limit, ~10% max total drawdown
+Target: 10% account win in 5-6 trading days
+
+Strategy: TSMOM14 (14-day momentum) at up to 2x leverage
+Risk scaling: Kelly-optimal fraction with daily-loss ceiling
 """
 
 import json, os, sys, math
 from pathlib import Path
+from datetime import datetime, timezone
 import numpy as np
 
 # ── Config ──
@@ -25,7 +26,7 @@ TAKER_FEE = 0.00075            # 0.075% per side
 
 # Data paths
 DATA_HL = Path("research/data/BTC_1d_snapshot.json")
-DATA_BINANCE = Path("research/data/BTC_1d_snapshot.json")  # fallback, same file
+DATA_BINANCE = Path("/opt/data/candles-binance/BTC_1d_snapshot.json")
 STATE_FILE = Path("research/output/forward_runner_v2_state.json")
 OUTPUT_FILE = Path("research/output/forward_runner_v2_output.json")
 
@@ -38,19 +39,6 @@ def load_candles(path: Path) -> np.ndarray:
         data = json.load(f)
     candles = data["candles"]
     return np.array([c[5] for c in candles])  # schema: [... close index 5]
-
-
-def load_meta(path: Path) -> dict:
-    """Load snapshot metadata (as-of timestamps) from candle JSON."""
-    if not path.exists():
-        return {}
-    with open(path) as f:
-        data = json.load(f)
-    return {
-        "last_close_utc": data.get("last_close_utc"),
-        "fetched_at_utc": data.get("fetched_at_utc"),
-        "source": data.get("source"),
-    }
 
 def ts_momentum(prices: np.ndarray, lookback: int) -> float:
     """Return position signal: 1 (long), -1 (short), 0 (flat)."""
@@ -106,7 +94,6 @@ def comp_sizing(vol: float, signal: int, entry_price: float,
     return {
         "action": f"ENTER_{direction}",
         "size": round(size, 2),
-        "kelly_fraction": round(kelly_fraction, 2),
         "leverage": round(target_lev, 2),
         "notional_usd": round(notional, 2),
         "qty_btc": round(pos_qty, 6),
@@ -118,30 +105,22 @@ def comp_sizing(vol: float, signal: int, entry_price: float,
 
 
 def main():
+    print(f"\n═══ Forward Runner v2 — TSMOM14 Comp ═══")
+    print(f"  Time: {datetime.now(timezone.utc).isoformat()}")
+    print(f"  Leverage target: {LEVERAGE_TARGET}x  |  Daily loss limit: {DAILY_LOSS_LIMIT*100:.0f}%")
+
     # ── Load data ──
     # Prefer HL data, fall back to Binance
     prices = load_candles(DATA_HL)
-    meta = load_meta(DATA_HL)
     source = "Hyperliquid"
     if prices is None:
         prices = load_candles(DATA_BINANCE)
-        meta = load_meta(DATA_BINANCE)
         source = "Binance"
     if prices is None:
         print("ERROR: No data available")
         sys.exit(1)
 
-    # The signal is computed AS OF the last committed data bar, not the wall
-    # clock. Deriving the timestamp from the snapshot keeps the committed
-    # output reproducible byte-for-byte from a clean checkout (no datetime.now).
-    signal_asof = meta.get("last_close_utc") or "unknown"
-    data_source = meta.get("source") or source
-
-    print(f"\n═══ Forward Runner v2 — TSMOM14 Comp ═══")
-    print(f"  Signal as-of (last data bar): {signal_asof}")
-    print(f"  Snapshot fetched: {meta.get('fetched_at_utc')}")
-    print(f"  Leverage target: {LEVERAGE_TARGET}x  |  Daily loss limit: {DAILY_LOSS_LIMIT*100:.0f}%")
-    print(f"  Data: {data_source} — {len(prices)} bars")
+    print(f"  Data: {source} — {len(prices)} bars")
 
     # ── Signal ──
     close = prices[-1]
@@ -151,7 +130,7 @@ def main():
     vol = estimate_vol(prices)
 
     # ── State ──
-    state = {"current_signal": signal, "last_update": signal_asof}
+    state = {"current_signal": signal, "last_update": datetime.now(timezone.utc).isoformat()}
 
     # Round current PnL tracking
     daily_pnl = 0.0
@@ -159,20 +138,16 @@ def main():
 
     # ── Sizing ──
     sizing = comp_sizing(vol, signal, close, close, daily_pnl)
-    # Compute the actual leverage that was applied (not the 2.0x target)
-    actual_leverage = sizing.get("leverage", 0)
     state["last_sizing"] = sizing
 
     # ── Output ──
     output = {
-        "signal_asof_utc": signal_asof,
-        "data_fetched_at_utc": meta.get("fetched_at_utc"),
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
         "btc_price": close,
         "volatility_pct": round(vol * 100, 2),
         "signal": "BULL" if signal > 0 else "BEAR" if signal < 0 else "FLAT",
         "lookback": LOOKBACK,
-        "leverage_target": LEVERAGE_TARGET,
-        "leverage_actual": actual_leverage,
+        "leverage": LEVERAGE_TARGET,
         "comp_target_pct": COMP_TARGET * 100,
         "daily_loss_limit_pct": DAILY_LOSS_LIMIT * 100,
         "position": {
@@ -212,9 +187,7 @@ def main():
     # ── Deliver signal ──
     print(f"\n── DELIVERY ──")
     status = "🟢" if signal > 0 else "🔴" if signal < 0 else "⚪"
-    print(f"{status} BTC ${close:,.0f} | TSMOM14 {output['signal']} "
-          f"{sizing['size']:.2f}x ({sizing['leverage']:.2f}x lev cap) | "
-          f"Kelly={sizing['kelly_fraction']:.2f} | Daily stop ${sizing['stop_price']:,.0f}")
+    print(f"{status} BTC ${close:,.0f} | TSMOM14 {output['signal']} {sizing['size']:.0%} pos @ 2.0x | Daily stop ${sizing['stop_price']:,.0f} | Comp target: {COMP_TARGET*100:.0f}%")
 
 if __name__ == "__main__":
     main()

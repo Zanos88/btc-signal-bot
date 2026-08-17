@@ -151,12 +151,14 @@ def walk_forward_cv(prices, strategy_fn, n_folds=5, min_train=500):
         # Get position vector for full series
         pos = strategy_fn(prices)
 
-        # Val period returns
+        # CAUSAL: pos[i] earns rets[i] (return from price[i] to price[i+1])
+        # NOT rets[i-1] which is the return *into* the decision price (look-ahead)
         val_pos = pos[val_start:val_end]
-        # val_rets is len(prices)-1; bar val_start-1 to val_end-2 maps to val_start..val_end prices
-        val_rets = rets[val_start-1:val_end-1]
-        val_gross = val_rets * val_pos[:len(val_rets)]
-        pos_for_trades = pos[max(30, val_start):val_end+1]
+        rets_end = min(val_start + len(val_pos), len(rets))
+        val_rets = rets[val_start:rets_end]
+        val_pos = val_pos[:len(val_rets)]  # trim to match rets length (last fold edge case)
+        val_gross = val_rets * val_pos
+        pos_for_trades = pos[max(30, val_start):val_end]
         n_trades = trade_count(pos_for_trades)
         costs = cost_series(len(val_gross), n_trades)
 
@@ -229,8 +231,11 @@ def main():
                 n_tr = m.get("n_trades", "?")
                 print(f"  {name:<30} {m['sharpe']:>8.3f} {m['dsr_prob']:>8.4f} {m['ann_ret_pct']:>8.2f} {m['vol_pct']:>8.2f} {m['max_dd_pct']:>8.2f} {m['net_mult']:>8.3f} {n_tr:>8}")
 
-    # ── Walk-forward CV ──
-    print(f"\n── Walk-Forward CV (5 folds, ~290 bars each) ──")
+    # ── Walk-forward CV (regime-stability check) ──
+    # Note: TSMOM30_base has no free parameters, so CV here is a regime-stability
+    # check, not out-of-sample validation of a fitted model. The conviction variant
+    # has a trailing window parameter (lookback=252) validated by CV.
+    print(f"\n── Walk-Forward CV (5 folds, ~290 bars each; regime-stability check) ──")
     for name, fn in strategies.items():
         folds = walk_forward_cv(closes, fn, n_folds=5)
         if folds:
@@ -278,27 +283,39 @@ def main():
     # ── Verdict ──
     ts_base = all_results.get("TSMOM30_base_full_net")
     bh = all_results.get("BuyHold_full_net")
+    dsr_info = all_results.get("_deflated_sharpe", {})
+    psr = ts_base.get("dsr_prob", 0) if ts_base else 0
+    dsr = dsr_info.get("dsr_prob", 0)
+    dsr_n = dsr_info.get("n_trials", "?")
     if ts_base and bh:
         sd = ts_base["sharpe"] - bh["sharpe"]
         dd_imp = ts_base["max_dd_pct"] - bh["max_dd_pct"]
         print(f"\n── Verdict ──")
         print(f"  TSMOM30_base net Sharpe: {ts_base['sharpe']} vs BuyHold: {bh['sharpe']} (Δ={sd:+.3f})")
         print(f"  TSMOM30_base net MaxDD: {ts_base['max_dd_pct']}% vs BuyHold: {bh['max_dd_pct']}% (Δ={-dd_imp:.0f}pp better)")
+        print(f"  PSR (single-trial Probabilistic Sharpe): {psr:.4f}")
+        print(f"  DSR (deflated across {dsr_n} trials):     {dsr:.4f}")
         if dd_imp > 5:
             print(f"\n  Jones defense-first thesis HOLDS: {dd_imp:.0f}pp better drawdown at matched returns")
+            if abs(sd) < 0.05:
+                print(f"  (Sharpe Δ{sd:+.3f} — statistically indistinguishable from B&H)")
+        elif dd_imp > 2:
+            print(f"  ➡️ Drawdown improvement {dd_imp:.0f}pp, borderline materiality")
         else:
-            print(f"  ➡️ Drawdown improvement {dd_imp:.1f}pp, borderline materiality")
+            print(f"  ➡️ Drawdown improvement {dd_imp:.0f}pp — marginal vs B&H")
         if sd > 0.05:
             print(f"  ✅ TSMOM30_base beats BuyHold on Sharpe")
         else:
             print(f"  ➡️ TSMOM30_base matches BuyHold on Sharpe (indistinguishable)")
-        print(f"  DSR probability: {ts_base['dsr_prob']:.4f}")
-        if ts_base['dsr_prob'] > 0.95:
-            print(f"  ✅ DSR > 0.95 — strategy has genuine edge")
-        elif ts_base['dsr_prob'] > 0.8:
+        if dsr > 0.95:
+            print(f"  ✅ DSR > 0.95 — strategy has genuine edge (defended against {dsr_n} trials)")
+        elif dsr > 0.8:
             print(f"  ⚠️ DSR > 0.8 but < 0.95 — moderate evidence")
         else:
-            print(f"  ❌ DSR < 0.8 — insufficient evidence of edge")
+            print(f"  ❌ DSR < 0.8 — insufficient evidence of risk-adjusted edge "
+                  f"(defensible on drawdown alone, not Sharpe)")
+        print(f"  ⚡ Real edge: ~{dd_imp:.0f}pp drawdown reduction at similar return — "
+              f"a defensive/convex claim, not a risk-adjusted one")
 
     # ── Save ──
     with open(RESULTS_PATH, "w") as f:
