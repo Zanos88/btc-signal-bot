@@ -17,7 +17,7 @@ from strategy.atr import wilder_atr
 from strategy.bias_4h import Bias, BiasResult, compute_bias
 from strategy.ichimoku import evaluate_ichimoku
 from strategy.rsi import Vote, evaluate_rsi
-from strategy.trigger_1h import TriggerDirection, TriggerResult, evaluate_trigger
+from strategy.trigger_1h import TriggerResult, evaluate_trigger
 
 MIN_REWARD_RISK = 2.0
 STRUCTURAL_STOP_BUFFER = 0.0015  # 0.15% beyond the S/R/swing level
@@ -68,7 +68,7 @@ class SuppressedSignal:
     direction: SignalDirection
     reward_risk: float
     reason: str
-    kind: str = "rr"  # "rr" | "fisher4h_exhaustion" — lets callers count suppression classes separately
+    kind: str = "rr"  # "rr" | "fisher4h_exhaustion" | "exhaustion_standdown" — lets callers count suppression classes separately
 
 
 def resolve_stop(

@@ -7,3 +7,6 @@ websockets>=12.0
 python-dotenv>=1.0
 typing_extensions>=4.0
 psycopg[binary]>=3.1
+# Telegram control-plane process (python -m telegram_control): the
+# ApplicationBuilder/CommandHandler API is python-telegram-bot v20+.
+python-telegram-bot>=20.0

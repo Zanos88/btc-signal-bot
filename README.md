@@ -27,9 +27,13 @@ candleSnapshot feed), and
 [`docs/STRATEGY_PSEUDOCODE.md`](docs/STRATEGY_PSEUDOCODE.md) for the
 decision tree the code implements.
 
-**This strategy is live and unvalidated — no backtest exists.** Parameters
-were chosen conservatively (cited defaults where they exist) but there is
-no historical performance evidence behind them. Treat every alert as an
+**This strategy is live and unvalidated — no proven edge exists.** A
+walk-forward backtest harness (`backtest.py`) and a full research program
+(`docs/RESEARCH_PROGRAM_SUMMARY.md`) DO exist, but their results are
+SIMULATED (idealized touch fills, no slippage/funding) and found no
+statistically provable edge in the reachable candle data. Parameters were
+chosen conservatively (cited defaults where they exist) but there is no
+validated live performance evidence behind them. Treat every alert as an
 untested hypothesis, not a proven edge.
 
 This repo is **completely separate** from the existing Bullphoric
@@ -71,6 +75,8 @@ alerts/                 # telegram.py, formats.py
 execution/              # propr_client.py (dry-run-gated Propr client) + vendor/propr_sdk.py
 db/                     # store.py (Postgres telemetry + live settings), schema.sql
 ledger/tracker.py       # hypothetical positions + daily P&L
+telegram_control/       # Telegram control-plane process (/settings, /risk, /run, trade panel) — `python -m telegram_control`
+guardian.py             # independent Prop-Saver watchdog process (soft-halt / hard-flatten) — `python guardian.py`
 main.py                 # Stage 2 scheduler loop (candle-close driven)
 tests/                  # pytest unit tests against synthetic data
 ```
@@ -133,8 +139,9 @@ and the `feature_flags` execution switch. **Note:** the running engine
 reads active timeframes, indicator toggles, live risk params, and signal
 geometry from Postgres (`strategy_settings`, `indicator_config`,
 `risk_params` — set via the Telegram `/settings` menu), *not* from
-`config.yaml`; the `data:` block in `config.yaml` documents the seed only
-(the engine does not read it). Likewise `risk.risk_pct`,
+`config.yaml`; in the `data:` block only the commented `timeframes` /
+`strategy_mode` lines are DB-backed and unread — `data.coin` IS read by
+the engine (it is the polled symbol, `main.py`). Likewise `risk.risk_pct`,
 `strategy.fisher_period`, `strategy.obv_sma_period`, and
 `strategy.min_reward_risk` are **documentation of the code's defaults, not
 live inputs** — the effective `risk_pct` comes from the DB `risk_params`,
@@ -160,7 +167,7 @@ be casually widened).
 python -m pytest -q
 ```
 
-The suite is **246 tests across 30 files** (235 passing, 11 skipped in a
+The suite is **262 tests across 32 files** (251 passing, 11 skipped in a
 default environment) covering the strategy, risk, ledger, alerts,
 execution-client and data layers against synthetic data (no live API
 calls). The 11 skips are the DB-backed suites that need
