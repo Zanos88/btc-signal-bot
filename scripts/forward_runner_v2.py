@@ -196,14 +196,16 @@ def main():
         },
     }
 
-    # ── Marks (append) ──
-    marks.append({
-        "ts": now,
-        "close": close,
-        "signal": signal,
-        "size": sizing["size"],
-        "equity": round(equity, 2),
-        "total_ret_pct": round((equity / START_EQUITY - 1) * 100, 3),
+    # ── Marks (append only on data change — one mark per daily close) ──
+    prev_mark_close = (prev_state or {}).get("paper", {}).get("prev_close")
+    if prev_mark_close != close:
+        marks.append({
+            "ts": now,
+            "close": close,
+            "signal": signal,
+            "size": sizing["size"],
+            "equity": round(equity, 2),
+            "total_ret_pct": round((equity / START_EQUITY - 1) * 100, 3),
         "flips": flips,
     })
     # keep the curve bounded
