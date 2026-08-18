@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
 """
-Forward Runner v2 — TSMOM14 Signal Writer
-Generates trade-ready signals with comp-informed sizing.
-NOTE: This is a paper signal-writer (Writes JSON, no exchange API).
-Kelly fraction uses full-sample Sharpe 0.93 as forward estimate (best available,
-but circular — see tsmom_variant_study for honest OOS assessment).
+Forward Runner v2 — TSMOM14 for Propr Comp
+Deployed as cron every 6h. Generates trade-ready signals with comp-compliant sizing
+AND accumulates a real paper equity curve so the champion strategy has forward P&L.
 
-Strategy: TSMOM14 (14-day momentum), sizing capped by daily-loss constraint.
-Actual leverage is computed from vol and daily loss limit, not the 2.0x target.
+Comp conditions: ~5% daily loss limit, ~10% max total drawdown
+Target: 10% account win in 5-6 trading days
+
+Strategy: TSMOM14 (14-day momentum) at up to 2x leverage
+Risk scaling: Kelly-optimal fraction with daily-loss ceiling
+
+Equity accumulation: each tick marks the prior position to market against the new
+close, applies the taker fee on flips, and appends a mark to
+research/output/forward_runner_v2_marks.json. Start equity $100,000.
 """
 
 import json, os, sys, math
@@ -23,12 +28,14 @@ DAILY_LOSS_LIMIT = 0.05        # 5% max daily drawdown
 COMP_TARGET = 0.10             # 10% account win target
 REGIME_DAYS = 60               # vol estimation window
 TAKER_FEE = 0.00075            # 0.075% per side
+START_EQUITY = 100_000.0
 
 # Data paths
 DATA_HL = Path("research/data/BTC_1d_snapshot.json")
-DATA_BINANCE = Path("research/data/BTC_1d_snapshot.json")  # fallback, same file
+DATA_BINANCE = Path("/opt/data/candles-binance/BTC_1d_snapshot.json")
 STATE_FILE = Path("research/output/forward_runner_v2_state.json")
 OUTPUT_FILE = Path("research/output/forward_runner_v2_output.json")
+MARKS_FILE = Path("research/output/forward_runner_v2_marks.json")
 
 # ── Helpers ──
 def load_candles(path: Path) -> np.ndarray:
@@ -104,10 +111,20 @@ def comp_sizing(vol: float, signal: int, entry_price: float,
     }
 
 
+def load_json(path: Path, default):
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return default
+
+
 def main():
     print(f"\n═══ Forward Runner v2 — TSMOM14 Comp ═══")
     print(f"  Time: {datetime.now(timezone.utc).isoformat()}")
     print(f"  Leverage target: {LEVERAGE_TARGET}x  |  Daily loss limit: {DAILY_LOSS_LIMIT*100:.0f}%")
+
+    base = Path(__file__).resolve().parent.parent
 
     # ── Load data ──
     # Prefer HL data, fall back to Binance
@@ -124,33 +141,83 @@ def main():
 
     # ── Signal ──
     close = prices[-1]
-    recent = prices[-(LOOKBACK + REGIME_DAYS):] if len(prices) > LOOKBACK + REGIME_DAYS else None
-
     signal = ts_momentum(prices, LOOKBACK)
     vol = estimate_vol(prices)
 
-    # ── State ──
-    state = {"current_signal": signal, "last_update": datetime.now(timezone.utc).isoformat()}
+    # ── Paper equity: mark prior position to market ──
+    now = datetime.now(timezone.utc).isoformat()
+    prev_state = load_json(base / STATE_FILE, {})
+    paper = prev_state.get("paper", {})
+    marks = load_json(base / MARKS_FILE, [])
 
-    # Round current PnL tracking
-    daily_pnl = 0.0
-    day_trades = 0
+    equity = float(paper.get("equity", START_EQUITY))
+    prev_close = paper.get("prev_close")
+    prev_signal = paper.get("prev_signal")
+    flips = int(paper.get("flips", 0))
+    total_fees = float(paper.get("total_fees", 0.0))
+    prev_size = float(paper.get("prev_size", 0.0))
+    first_mark = paper.get("first_mark_ts", now)
+
+    # If we have a previous close and were in a position, realize the move
+    if prev_close is not None and prev_signal is not None and prev_close > 0:
+        ret = (close - prev_close) / prev_close
+        if prev_signal != 0 and ret != 0:
+            equity *= (1 + prev_signal * ret * prev_size)
+
+    # Flip fee when signal changes (or first entry)
+    if prev_signal is None:
+        # first run: pay entry fee if taking a position
+        if signal != 0:
+            fee = TAKER_FEE * abs(signal) * equity
+            equity -= fee
+            total_fees += fee
+    elif signal != prev_signal:
+        fee = TAKER_FEE * abs(signal - prev_signal) * equity
+        equity -= fee
+        total_fees += fee
+        flips += 1
 
     # ── Sizing ──
-    sizing = comp_sizing(vol, signal, close, close, daily_pnl)
-    # Compute the actual leverage that was applied (not the 2.0x target)
-    actual_leverage = sizing.get("leverage", 0)
-    state["last_sizing"] = sizing
+    sizing = comp_sizing(vol, signal, close, close, 0.0, equity)
+
+    # ── State (persist) ──
+    state = {
+        "current_signal": signal,
+        "last_update": now,
+        "last_sizing": sizing,
+        "paper": {
+            "equity": round(equity, 2),
+            "prev_close": close,
+            "prev_signal": signal,
+            "prev_size": sizing["size"],
+            "flips": flips,
+            "total_fees": round(total_fees, 2),
+            "first_mark_ts": first_mark,
+        },
+    }
+
+    # ── Marks (append) ──
+    marks.append({
+        "ts": now,
+        "close": close,
+        "signal": signal,
+        "size": sizing["size"],
+        "equity": round(equity, 2),
+        "total_ret_pct": round((equity / START_EQUITY - 1) * 100, 3),
+        "flips": flips,
+    })
+    # keep the curve bounded
+    if len(marks) > 2000:
+        marks = marks[-2000:]
 
     # ── Output ──
     output = {
-        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "timestamp_utc": now,
         "btc_price": close,
         "volatility_pct": round(vol * 100, 2),
         "signal": "BULL" if signal > 0 else "BEAR" if signal < 0 else "FLAT",
         "lookback": LOOKBACK,
-        "leverage_target": LEVERAGE_TARGET,
-        "leverage_actual": actual_leverage,
+        "leverage": sizing["leverage"],
         "comp_target_pct": COMP_TARGET * 100,
         "daily_loss_limit_pct": DAILY_LOSS_LIMIT * 100,
         "position": {
@@ -165,34 +232,40 @@ def main():
             "rationale": sizing["rationale"]
         },
         "account": {
-            "equity": 100000,
-            "daily_pnl": daily_pnl,
-            "daily_loss_limit": DAILY_LOSS_LIMIT * 100000,
-            "target_win": COMP_TARGET * 100000
+            "equity": round(equity, 2),
+            "start_equity": START_EQUITY,
+            "total_return_pct": round((equity / START_EQUITY - 1) * 100, 3),
+            "flips": flips,
+            "total_fees": round(total_fees, 2),
+            "daily_pnl": 0.0,
+            "daily_loss_limit": DAILY_LOSS_LIMIT * equity,
+            "target_win": COMP_TARGET * equity
         }
     }
 
     # Save
-    base = Path(__file__).resolve().parent.parent
     with open(base / STATE_FILE, "w") as f:
         json.dump(state, f, indent=2)
     with open(base / OUTPUT_FILE, "w") as f:
         json.dump(output, f, indent=2)
+    with open(base / MARKS_FILE, "w") as f:
+        json.dump(marks, f, indent=2)
 
     print(f"\n  BTC: ${close:,.0f} | Vol: {vol*100:.1f}% daily | Signal: {output['signal']}")
-    print(f"  Size: {sizing['size']:.1f}x ({sizing['leverage']:.1f}x leverage)")
+    print(f"  Size: {sizing['size']:.2f}x ({sizing['leverage']:.2f}x leverage)")
     print(f"  Notional: ${sizing['notional_usd']:,.0f}")
     print(f"  Stop: ${sizing['stop_price']:,.0f}")
     print(f"  Rationale: {sizing['rationale']}")
+    print(f"\n  PAPER EQUITY: ${equity:,.2f}  ({output['account']['total_return_pct']:+.2f}% total | {flips} flips | ${total_fees:,.2f} fees)")
+    print(f"  Marks: {len(marks)} (→ {MARKS_FILE})")
     print(f"\n  Saved → {STATE_FILE}")
     print(f"         {OUTPUT_FILE}")
 
     # ── Deliver signal ──
     print(f"\n── DELIVERY ──")
     status = "🟢" if signal > 0 else "🔴" if signal < 0 else "⚪"
-    print(f"{status} BTC ${close:,.0f} | TSMOM14 {output['signal']} "
-          f"{sizing['size']:.2f}x ({sizing['leverage']:.2f}x lev cap) | "
-          f"Kelly={kelly_fraction:.2f} | Daily stop ${sizing['stop_price']:,.0f}")
+    print(f"{status} BTC ${close:,.0f} | TSMOM14 {output['signal']} {sizing['size']:.2f}x ({sizing['leverage']:.2f}x lev) | "
+          f"Paper ${equity:,.0f} ({output['account']['total_return_pct']:+.2f}%) | Stop ${sizing['stop_price']:,.0f} | Comp target: {COMP_TARGET*100:.0f}%")
 
 if __name__ == "__main__":
     main()

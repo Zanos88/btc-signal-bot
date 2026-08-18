@@ -59,6 +59,10 @@ POLL_SECONDS = 300
 TAG = "[TREND-FWD paper]"
 
 STRATEGIES = {
+    # Tournament champion (TSMOM14 comp strategy) — the variant that survived
+    # the variant study (DSR 0.866 deflated, holdout Sharpe 1.14). Must be
+    # tracked so the forward test measures the strategy we would actually trade.
+    "tsmom14": lambda cs: tsmom_positions(cs, 14),
     "tsmom30": lambda cs: tsmom_positions(cs, 30),
     "sma50": lambda cs: sma_positions(cs, 50),
     "buy_hold": lambda cs: [1] * len(cs),
