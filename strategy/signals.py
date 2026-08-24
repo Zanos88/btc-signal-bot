@@ -16,7 +16,7 @@ from data.feed import Candle
 from strategy.atr import wilder_atr
 from strategy.bias_4h import Bias, BiasResult, compute_bias
 from strategy.ichimoku import evaluate_ichimoku
-from strategy.rsi import Vote, evaluate_rsi
+from strategy.rsi import evaluate_rsi
 from strategy.trigger_1h import TriggerResult, evaluate_trigger
 
 MIN_REWARD_RISK = 2.0

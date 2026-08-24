@@ -22,7 +22,6 @@ import logging
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from risk.gate import evaluate_gate
 from risk.sizing import MAX_RISK_PCT, MIN_RISK_PCT
 from strategy.signals import Signal, SignalDirection
 from telegram_control.handlers import (
@@ -332,7 +331,6 @@ async def cmd_menu(update, context, services: ControlServices) -> None:
         return
     # attach the persistent reply keyboard alongside the inline menu
     if getattr(update, "message", None) is not None:
-        from telegram_control.handlers import _to_ptb_markup
         try:
             from telegram import ReplyKeyboardMarkup
             kb = ReplyKeyboardMarkup.de_json(persistent_reply_keyboard(), None)
