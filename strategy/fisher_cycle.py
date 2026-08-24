@@ -28,7 +28,6 @@ from enum import Enum
 from typing import Sequence
 
 from data.feed import Candle
-from strategy.atr import wilder_atr
 from strategy.bias_4h import Bias, compute_bias
 
 DEFAULT_EXHAUSTION_THRESHOLD = 2.0

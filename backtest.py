@@ -50,7 +50,6 @@ from strategy.signals import (
     evaluate_signal,
 )
 from strategy.counter_trend import (
-    DEFAULT_CROSS_LOOKBACK,
     OBV_RULES,
     CounterTrendSignal,
     evaluate_counter_trend,
