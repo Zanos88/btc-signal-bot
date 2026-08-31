@@ -167,7 +167,7 @@ be casually widened).
 python -m pytest -q
 ```
 
-The suite is **262 tests across 32 files** (251 passing, 11 skipped in a
+The suite is **268 tests across 33 files** (257 passing, 11 skipped in a
 default environment) covering the strategy, risk, ledger, alerts,
 execution-client and data layers against synthetic data (no live API
 calls). The 11 skips are the DB-backed suites that need

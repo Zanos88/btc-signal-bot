@@ -105,13 +105,15 @@ substitute for reading them.
 | Python SDK | Yes — `python/propr_sdk.py` in the repo; **designed to be copied into the project, not pip-installed** |
 | OpenAPI spec | Referenced at the end of `docs/api.md` |
 
-**Consequence for Stage 1 scaffold:** `execution/propr_stub.py` method
-names/signatures should match the SDK's — `setup()`, `get_account()`,
-`create_order(...)`, `get_open_positions()`, `close_position()` — so
-Stage 2 can swap the stub for the real SDK with no interface change.
-(The scaffold in this repo currently uses `place_order` /
-`cancel_order` / `get_positions` / `get_equity` naming from Revision 1;
-**rename to match the SDK's naming above during implementation.**)
+**Consequence for the execution layer — RESOLVED (Stage 2):** the
+original `execution/propr_stub.py` no longer exists. It was replaced by
+the dry-run-gated `execution/propr_client.py`, which wraps the vendored
+SDK (`execution/vendor/propr_sdk.py`) and already uses the SDK's naming —
+`setup()`, `get_account()`, `create_order(...)` (via
+`create_entry_with_bracket`), `get_open_positions()`, `close_position()`.
+The Revision 1 placeholder names (`place_order` / `cancel_order` /
+`get_positions` / `get_equity`) are gone; no interface-rename work
+remains.
 
 ## 3.2 Fisher Transform — VERIFIED
 
@@ -209,12 +211,12 @@ https://docs.chainstack.com/reference/hyperliquid-info-candle-snapshot
    `GET /challenges` (no auth required) once the account is purchased.
    Section 2 of the build spec states the user's own stated parameters,
    not a value independently verified against Propr's API.
-5. **Propr execution method naming** — this scaffold's
-   `execution/propr_stub.py` currently uses placeholder method names from
-   Revision 1 (`place_order`, `cancel_order`, `get_positions`,
-   `get_equity`). Rename to match the verified SDK's `create_order`,
-   `get_open_positions`, `close_position`, `get_account`, `setup` during
-   implementation so Stage 2 is a true drop-in.
+5. **Propr execution method naming — RESOLVED.** The Revision 1
+   `execution/propr_stub.py` placeholder names (`place_order`,
+   `cancel_order`, `get_positions`, `get_equity`) are gone: `propr_stub.py`
+   was replaced by `execution/propr_client.py`, which already uses the
+   verified SDK's `create_order`, `get_open_positions`, `close_position`,
+   `get_account`, `setup`. No rename work remains.
 6. **Propr WebSocket message schemas** — endpoint and event names
    (`account.updated`, `order.filled`, `position.updated`) are confirmed,
    but exact payload schemas are only in `docs/websocket.md` in the
