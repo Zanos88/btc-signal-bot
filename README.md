@@ -124,10 +124,14 @@ capture as needed.
 
 ### Stopping
 
-`Ctrl+C` (SIGINT) or send SIGTERM to the process — there is no persisted
-state beyond the in-memory `Ledger`/`CircuitBreaker` objects for Stage 1,
-so a restart begins a fresh day/equity curve from `config.yaml`'s
-`starting_equity_usd`. This is a known Stage 1 limitation (see Open Items).
+`Ctrl+C` (SIGINT) or send SIGTERM to the process — the **trading state**
+(the `Ledger`'s open/closed positions and equity curve, and the
+`CircuitBreaker`) is in-memory only, so a restart begins a fresh
+day/equity curve from `config.yaml`'s `starting_equity_usd`. This is a
+known Stage 1 limitation (see Open Items). Note that the persisted equity
+high-water mark (`equity_hwm` table) and the DB-backed engine settings
+(`engine_state`, `risk_params`, `indicator_config`, `strategy_settings`)
+DO survive a restart — only the paper P&L baseline resets.
 
 ### Configuring
 
